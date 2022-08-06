@@ -73,9 +73,9 @@ class Cascade(object):
                 mean_effective_gain = 10*numpy.log10(interconnect_voltage_gain**2 / (1 - round_trip_voltage_gain**2)) #Equation 2.59
                 max_effective_gain = 20*numpy.log10(interconnect_voltage_gain / (1 - round_trip_voltage_gain)) #Equation 2.55
                 min_effective_gain = 20*numpy.log10(interconnect_voltage_gain / (1 + round_trip_voltage_gain)) #Equation 2.56
-                gain_std_dev = 0.7 * (max_effective_gain - min_effective_gain) #Equation 2.74
+                gain_std_dev = 0.7 * (max_effective_gain - mean_effective_gain) #Equation 2.74
                 phase_uncertainty = numpy.arcsin(round_trip_voltage_gain) / (2 * numpy.pi) * 360 #Equation 2.81
-                phase_std_dev = 0.7 * phase_uncertainty #Equation 282
+                phase_std_dev = 0.7 * phase_uncertainty #Equation 2.82
 
                 element_derived_data["Mean Gain"] = mean_effective_gain
                 element_derived_data["Max Gain"] = max_effective_gain
@@ -115,9 +115,9 @@ class Cascade(object):
                 element_cumulative_data["Phase Std Dev"] = lineup_derived_data[i]["Phase Std Dev"]
             else:
                 element_cumulative_data["Gain Std Dev"] = numpy.sqrt((lineup_derived_data[i]["Gain Std Dev"])**2 +
-                        (lineup_derived_data[i-1]["Gain Std Dev"])**2)
+                        (lineup_cumulative_data[i-1]["Gain Std Dev"])**2)
                 element_cumulative_data["Phase Std Dev"] = numpy.sqrt((lineup_derived_data[i]["Phase Std Dev"])**2 +
-                        (lineup_derived_data[i-1]["Phase Std Dev"])**2)
+                        (lineup_cumulative_data[i-1]["Phase Std Dev"])**2)
 
             #Appending a copy as python dictionaries are mutable and a reference is passed
             lineup_cumulative_data.append(element_cumulative_data.copy())
@@ -139,19 +139,3 @@ class Cascade(object):
             element["Gain Std Dev"] = round(element["Gain Std Dev"], 2)
             element["Phase Std Dev"] = round(element["Phase Std Dev"], 4)
         return lineup_cumulative_data
-
-module_one = Module(gain=12, gain_uncertainty=1, output_vswr=1.5, gain_std_dev=0.5)
-cable_one = Interconnect(gain=-1.5)
-module_two = Module(gain=8, gain_uncertainty=2, input_vswr=1.5, output_vswr=2, gain_std_dev=1.25)
-
-test = Cascade()
-test.add_element(module_one)
-test.add_element(cable_one)
-test.add_element(module_two)
-
-results = test.calculate_cumulative_data()
-display_results = test.round_cumulative_data(results)
-
-for i in range(0, len(display_results)):
-    element = display_results[i]
-    print("Output at stage {}: {}".format(i, display_results[i]))
