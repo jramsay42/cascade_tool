@@ -7,19 +7,26 @@ Assumptions:
     Module gain is the transducer power gain
     Modules are unilateral
     Interconnects are at the reference impedance
+    Module parameters referred to the reference impedance
 """
 import types
 import numpy
 
 class Module(object):
-    def __init__(self, gain=0, gain_uncertainty=0, input_vswr=1, output_vswr=1, p1dB=1000, noise_figure=0, gain_std_dev=0):
+    def __init__(self, gain=0, gain_uncertainty=0, input_vswr=1, output_vswr=1, p1dB=1000,
+             oip3=1000, noise_figure=0, gain_std_dev=0, noise_figure_uncertainty=0,
+             p1dB_uncertainty=0, oip3_uncertainty=0):
         """
         gain in dB, negative for a loss
         gain_uncertainty in dB +/- from nominal value
         input_vswr as dimensionless ratio
         output_vswr as dimensionless ratio
         p1dB in dB referred to the output
+        p1dB_uncertainty in dB +/- from nominal value
+        oip3 in dB referred to the output
+        oip3_uncertainty in dB +/- from nominal value
         noise_figure in dB
+        noise_figure_uncertainty in dB +/- from nominal value
         gain_std_dev in dB
         """
         self.gain = gain
@@ -28,27 +35,39 @@ class Module(object):
         self.input_vswr = input_vswr
         self.output_vswr = output_vswr
         self.p1dB = p1dB
+        self.p1dB_uncertainty = p1dB_uncertainty
+        self.oip3 = oip3
+        self.oip3_uncertainty = oip3_uncertainty
         self.noise_figure = noise_figure
+        self.noise_figure_uncertainty = noise_figure_uncertainty
 
 class Interconnect(object):
-    def __init__(self, gain=0, gain_uncertainty=0, input_vswr=1, output_vswr=1):
+    def __init__(self, gain=0, gain_uncertainty=0, input_vswr=1, output_vswr=1, noise_figure=0):
         """
-        Model of a pssive interconnect referred to a system impedance
+        Model of a passive interconnect referred to a system impedance
 
         gain in dB, negative for a loss
         gain_uncertainty in dB +/- from nominal value
         input_vswr as dimensionless ratio
         output_vswr as dimensionless ratio
+        noise_figure in dB
         """
         self.gain = gain
         self.gain_uncertainty = gain_uncertainty
         self.input_vswr = input_vswr
         self.output_vswr = output_vswr
+        self.noise_figure = noise_figure
+
+class VariableAttenuator(Module):
+    def __init__(self):
+        pass
 
 class Cascade(object):
     def __init__(self):
+        #A lineup must go module -> interconnect -> module
         self.lineup = []
-        self.keys = ["Mean Gain", "Max Gain", "Min Gain", "Gain Std Dev", "Phase +/-", "Phase Std Dev"]
+        self.keys = ["Mean Gain", "Max Gain", "Min Gain", "Gain Std Dev", "Phase +/-", "Phase Std Dev",
+                "Mean Noise Figure", "Max Noise Figure", "Min Noise Figure", "Mean P1dB", "Max P1dB", "Min P1dB"]
 
     def add_element(self, element):
         self.lineup.append(element)
@@ -109,11 +128,14 @@ class Cascade(object):
             element_cumulative_data["Max Gain"] += lineup_derived_data[i]["Max Gain"]
             element_cumulative_data["Min Gain"] += lineup_derived_data[i]["Min Gain"]
             element_cumulative_data["Phase +/-"] += lineup_derived_data[i]["Phase +/-"]
+            #TODO: Implement noise
+            #element_cumulative_data["Noise Figure"] = 0
 
             if i==0:
                 element_cumulative_data["Gain Std Dev"] = lineup_derived_data[i]["Gain Std Dev"]
                 element_cumulative_data["Phase Std Dev"] = lineup_derived_data[i]["Phase Std Dev"]
             else:
+                #Assumes the errors are uncorrelated, so we take the root of the sum of squares
                 element_cumulative_data["Gain Std Dev"] = numpy.sqrt((lineup_derived_data[i]["Gain Std Dev"])**2 +
                         (lineup_cumulative_data[i-1]["Gain Std Dev"])**2)
                 element_cumulative_data["Phase Std Dev"] = numpy.sqrt((lineup_derived_data[i]["Phase Std Dev"])**2 +
@@ -138,4 +160,7 @@ class Cascade(object):
             element["Phase +/-"] = round(element["Phase +/-"], 4)
             element["Gain Std Dev"] = round(element["Gain Std Dev"], 2)
             element["Phase Std Dev"] = round(element["Phase Std Dev"], 4)
+            element["Mean Noise Figure"] = round(element["Mean Noise Figure"], 2)
+            element["Max Noise Figure"] = round(element["Max Noise Figure"], 2)
+            element["Min Noise Figure"] = round(element["Min Noise Figure"], 2)
         return lineup_cumulative_data
